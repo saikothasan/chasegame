@@ -2,8 +2,14 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+  ]);
   runApp(const ChaseGameApp());
 }
 
@@ -43,64 +49,119 @@ class _GameWrapperState extends State<GameWrapper> {
   bool enableObstacles = true;
   bool enablePowerups = true;
   String gameMode = 'classic'; // classic, timeAttack, survival
+  
+  // Device detection
+  bool get isMobile => MediaQuery.of(context).size.shortestSide < 600;
 
   @override
   Widget build(BuildContext context) {
-    if (showTitleScreen) {
-      return TitleScreen(
-        onStartGame: () {
-          setState(() {
-            showTitleScreen = false;
-          });
-        },
-        onShowInstructions: () {
-          setState(() {
-            showInstructions = true;
-          });
-        },
-        onShowSettings: () {
-          setState(() {
-            showSettings = true;
-          });
-        },
-        showInstructions: showInstructions,
-        showSettings: showSettings,
-        onCloseModal: () {
-          setState(() {
-            showInstructions = false;
-            showSettings = false;
-          });
-        },
-        onSaveSettings: (duration, speed, obstacles, powerups, mode) {
-          setState(() {
-            gameDuration = duration;
-            playerSpeed = speed;
-            enableObstacles = obstacles;
-            enablePowerups = powerups;
-            gameMode = mode;
-            showSettings = false;
-          });
-        },
-        gameDuration: gameDuration,
-        playerSpeed: playerSpeed,
-        enableObstacles: enableObstacles,
-        enablePowerups: enablePowerups,
-        gameMode: gameMode,
-      );
-    } else {
-      return ChaseGameScreen(
-        onBackToTitle: () {
-          setState(() {
-            showTitleScreen = true;
-          });
-        },
-        gameDuration: gameDuration,
-        playerSpeed: playerSpeed,
-        enableObstacles: enableObstacles,
-        enablePowerups: enablePowerups,
-        gameMode: gameMode,
-      );
-    }
+    return OrientationBuilder(
+      builder: (context, orientation) {
+        // Force landscape orientation for mobile
+        if (orientation == Orientation.portrait && !kIsWeb) {
+          return const RotateDeviceMessage();
+        }
+        
+        if (showTitleScreen) {
+          return TitleScreen(
+            onStartGame: () {
+              setState(() {
+                showTitleScreen = false;
+              });
+            },
+            onShowInstructions: () {
+              setState(() {
+                showInstructions = true;
+              });
+            },
+            onShowSettings: () {
+              setState(() {
+                showSettings = true;
+              });
+            },
+            showInstructions: showInstructions,
+            showSettings: showSettings,
+            onCloseModal: () {
+              setState(() {
+                showInstructions = false;
+                showSettings = false;
+              });
+            },
+            onSaveSettings: (duration, speed, obstacles, powerups, mode) {
+              setState(() {
+                gameDuration = duration;
+                playerSpeed = speed;
+                enableObstacles = obstacles;
+                enablePowerups = powerups;
+                gameMode = mode;
+                showSettings = false;
+              });
+            },
+            gameDuration: gameDuration,
+            playerSpeed: playerSpeed,
+            enableObstacles: enableObstacles,
+            enablePowerups: enablePowerups,
+            gameMode: gameMode,
+            isMobile: isMobile,
+          );
+        } else {
+          return ChaseGameScreen(
+            onBackToTitle: () {
+              setState(() {
+                showTitleScreen = true;
+              });
+            },
+            gameDuration: gameDuration,
+            playerSpeed: playerSpeed,
+            enableObstacles: enableObstacles,
+            enablePowerups: enablePowerups,
+            gameMode: gameMode,
+            isMobile: isMobile,
+          );
+        }
+      },
+    );
+  }
+}
+
+class RotateDeviceMessage extends StatelessWidget {
+  const RotateDeviceMessage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.indigo.shade900,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.screen_rotation,
+              size: 80,
+              color: Colors.white,
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Please rotate your device',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'This game is best played in landscape mode',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 16,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -117,6 +178,7 @@ class TitleScreen extends StatelessWidget {
   final bool enableObstacles;
   final bool enablePowerups;
   final String gameMode;
+  final bool isMobile;
 
   const TitleScreen({
     super.key,
@@ -132,6 +194,7 @@ class TitleScreen extends StatelessWidget {
     required this.enableObstacles,
     required this.enablePowerups,
     required this.gameMode,
+    required this.isMobile,
   });
 
   @override
@@ -171,70 +234,77 @@ class TitleScreen extends StatelessWidget {
             }),
             
             Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Game title
-                  const Text(
-                    'CHASE ARENA',
-                    style: TextStyle(
-                      fontSize: 64,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 2,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black45,
-                          offset: Offset(2, 2),
-                          blurRadius: 4,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '2-PLAYER WEB GAME',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.white70,
-                      letterSpacing: 4,
-                    ),
-                  ),
-                  const SizedBox(height: 60),
-                  
-                  // Game characters preview
-                  Row(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildPlayerPreview(
-                        'CHASER',
-                        Colors.red.shade400,
-                        Colors.red.shade700,
+                      // Game title
+                      Text(
+                        'CHASE ARENA',
+                        style: TextStyle(
+                          fontSize: isMobile ? 40 : 64,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 2,
+                          shadows: const [
+                            Shadow(
+                              color: Colors.black45,
+                              offset: Offset(2, 2),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(width: 40),
-                      Container(
-                        width: 80,
-                        height: 2,
-                        color: Colors.white30,
+                      const SizedBox(height: 8),
+                      const Text(
+                        '2-PLAYER GAME',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.white70,
+                          letterSpacing: 4,
+                        ),
                       ),
-                      const SizedBox(width: 40),
-                      _buildPlayerPreview(
-                        'RUNNER',
-                        Colors.blue.shade400,
-                        Colors.blue.shade700,
+                      SizedBox(height: isMobile ? 30 : 60),
+                      
+                      // Game characters preview
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildPlayerPreview(
+                            'CHASER',
+                            Colors.red.shade400,
+                            Colors.red.shade700,
+                            isMobile,
+                          ),
+                          SizedBox(width: isMobile ? 20 : 40),
+                          Container(
+                            width: isMobile ? 40 : 80,
+                            height: 2,
+                            color: Colors.white30,
+                          ),
+                          SizedBox(width: isMobile ? 20 : 40),
+                          _buildPlayerPreview(
+                            'RUNNER',
+                            Colors.blue.shade400,
+                            Colors.blue.shade700,
+                            isMobile,
+                          ),
+                        ],
                       ),
+                      
+                      SizedBox(height: isMobile ? 30 : 60),
+                      
+                      // Menu buttons
+                      _buildMenuButton('START GAME', Icons.play_arrow, onStartGame, isMobile),
+                      const SizedBox(height: 16),
+                      _buildMenuButton('HOW TO PLAY', Icons.help_outline, onShowInstructions, isMobile),
+                      const SizedBox(height: 16),
+                      _buildMenuButton('SETTINGS', Icons.settings, onShowSettings, isMobile),
                     ],
                   ),
-                  
-                  const SizedBox(height: 60),
-                  
-                  // Menu buttons
-                  _buildMenuButton('START GAME', Icons.play_arrow, onStartGame),
-                  const SizedBox(height: 16),
-                  _buildMenuButton('HOW TO PLAY', Icons.help_outline, onShowInstructions),
-                  const SizedBox(height: 16),
-                  _buildMenuButton('SETTINGS', Icons.settings, onShowSettings),
-                ],
+                ),
               ),
             ),
             
@@ -256,23 +326,25 @@ class TitleScreen extends StatelessWidget {
             
             // Instructions modal
             if (showInstructions)
-              _buildInstructionsModal(context),
+              _buildInstructionsModal(context, isMobile),
               
             // Settings modal
             if (showSettings)
-              _buildSettingsModal(context),
+              _buildSettingsModal(context, isMobile),
           ],
         ),
       ),
     );
   }
   
-  Widget _buildPlayerPreview(String label, Color color, Color shadowColor) {
+  Widget _buildPlayerPreview(String label, Color color, Color shadowColor, bool isMobile) {
+    final size = isMobile ? 40.0 : 60.0;
+    
     return Column(
       children: [
         Container(
-          width: 60,
-          height: 60,
+          width: size,
+          height: size,
           decoration: BoxDecoration(
             color: color,
             shape: BoxShape.circle,
@@ -296,9 +368,9 @@ class TitleScreen extends StatelessWidget {
         const SizedBox(height: 12),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.white,
-            fontSize: 16,
+            fontSize: isMobile ? 14 : 16,
             fontWeight: FontWeight.w600,
             letterSpacing: 1,
           ),
@@ -307,14 +379,17 @@ class TitleScreen extends StatelessWidget {
     );
   }
   
-  Widget _buildMenuButton(String label, IconData icon, VoidCallback onPressed) {
+  Widget _buildMenuButton(String label, IconData icon, VoidCallback onPressed, bool isMobile) {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.white,
         foregroundColor: Colors.indigo.shade900,
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-        minimumSize: const Size(240, 54),
+        padding: EdgeInsets.symmetric(
+          horizontal: isMobile ? 20 : 32, 
+          vertical: isMobile ? 12 : 16
+        ),
+        minimumSize: Size(isMobile ? 200 : 240, isMobile ? 48 : 54),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(30),
         ),
@@ -323,12 +398,12 @@ class TitleScreen extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 24),
-          const SizedBox(width: 12),
+          Icon(icon, size: isMobile ? 20 : 24),
+          SizedBox(width: isMobile ? 8 : 12),
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 16,
+            style: TextStyle(
+              fontSize: isMobile ? 14 : 16,
               fontWeight: FontWeight.bold,
               letterSpacing: 1,
             ),
@@ -338,7 +413,7 @@ class TitleScreen extends StatelessWidget {
     );
   }
   
-  Widget _buildInstructionsModal(BuildContext context) {
+  Widget _buildInstructionsModal(BuildContext context, bool isMobile) {
     return _buildModal(
       context,
       title: 'HOW TO PLAY',
@@ -348,29 +423,36 @@ class TitleScreen extends StatelessWidget {
           _buildInstructionSection(
             'Game Objective',
             'The Chaser (Red) must catch the Runner (Blue) before time runs out. If the Runner survives until the timer ends, they win!',
+            isMobile,
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: isMobile ? 15 : 20),
           _buildInstructionSection(
             'Controls',
-            '• Player 1 (Chaser): WASD keys to move\n• Player 2 (Runner): Arrow keys to move',
+            isMobile 
+                ? '• Mobile: Use the virtual joysticks on screen\n• Desktop: Player 1 (WASD keys), Player 2 (Arrow keys)'
+                : '• Player 1 (Chaser): WASD keys to move\n• Player 2 (Runner): Arrow keys to move',
+            isMobile,
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: isMobile ? 15 : 20),
           _buildInstructionSection(
             'Power-ups',
             '• Speed Boost: Temporarily increases movement speed\n• Shield: Makes the Runner immune to being caught\n• Freeze: Temporarily stops the opponent',
+            isMobile,
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: isMobile ? 15 : 20),
           _buildInstructionSection(
             'Game Modes',
             '• Classic: Standard chase with a time limit\n• Time Attack: Runner must collect time bonuses to survive\n• Survival: Multiple rounds with increasing difficulty',
+            isMobile,
           ),
         ],
       ),
       onClose: onCloseModal,
+      isMobile: isMobile,
     );
   }
   
-  Widget _buildSettingsModal(BuildContext context) {
+  Widget _buildSettingsModal(BuildContext context, bool isMobile) {
     // Local state for settings
     int localDuration = gameDuration;
     double localSpeed = playerSpeed;
@@ -386,11 +468,11 @@ class TitleScreen extends StatelessWidget {
           content: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Game Duration',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize: isMobile ? 14 : 16,
                 ),
               ),
               Slider(
@@ -405,13 +487,13 @@ class TitleScreen extends StatelessWidget {
                   });
                 },
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: isMobile ? 15 : 20),
               
-              const Text(
+              Text(
                 'Player Speed',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize: isMobile ? 14 : 16,
                 ),
               ),
               Slider(
@@ -426,83 +508,149 @@ class TitleScreen extends StatelessWidget {
                   });
                 },
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: isMobile ? 15 : 20),
               
-              Row(
-                children: [
-                  Expanded(
-                    child: SwitchListTile(
-                      title: const Text('Obstacles'),
-                      value: localObstacles,
-                      onChanged: (value) {
-                        setState(() {
-                          localObstacles = value;
-                        });
-                      },
+              isMobile
+                  ? Column(
+                      children: [
+                        SwitchListTile(
+                          title: const Text('Obstacles'),
+                          value: localObstacles,
+                          onChanged: (value) {
+                            setState(() {
+                              localObstacles = value;
+                            });
+                          },
+                        ),
+                        SwitchListTile(
+                          title: const Text('Power-ups'),
+                          value: localPowerups,
+                          onChanged: (value) {
+                            setState(() {
+                              localPowerups = value;
+                            });
+                          },
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: SwitchListTile(
+                            title: const Text('Obstacles'),
+                            value: localObstacles,
+                            onChanged: (value) {
+                              setState(() {
+                                localObstacles = value;
+                              });
+                            },
+                          ),
+                        ),
+                        Expanded(
+                          child: SwitchListTile(
+                            title: const Text('Power-ups'),
+                            value: localPowerups,
+                            onChanged: (value) {
+                              setState(() {
+                                localPowerups = value;
+                              });
+                            },
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  Expanded(
-                    child: SwitchListTile(
-                      title: const Text('Power-ups'),
-                      value: localPowerups,
-                      onChanged: (value) {
-                        setState(() {
-                          localPowerups = value;
-                        });
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
+              SizedBox(height: isMobile ? 15 : 20),
               
-              const Text(
+              Text(
                 'Game Mode',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize: isMobile ? 14 : 16,
                 ),
               ),
               const SizedBox(height: 10),
               
-              Row(
-                children: [
-                  _buildGameModeButton(
-                    'Classic',
-                    'classic',
-                    localGameMode,
-                    () {
-                      setState(() {
-                        localGameMode = 'classic';
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 10),
-                  _buildGameModeButton(
-                    'Time Attack',
-                    'timeAttack',
-                    localGameMode,
-                    () {
-                      setState(() {
-                        localGameMode = 'timeAttack';
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 10),
-                  _buildGameModeButton(
-                    'Survival',
-                    'survival',
-                    localGameMode,
-                    () {
-                      setState(() {
-                        localGameMode = 'survival';
-                      });
-                    },
-                  ),
-                ],
-              ),
+              isMobile
+                  ? Column(
+                      children: [
+                        _buildGameModeButton(
+                          'Classic',
+                          'classic',
+                          localGameMode,
+                          () {
+                            setState(() {
+                              localGameMode = 'classic';
+                            });
+                          },
+                          true,
+                        ),
+                        const SizedBox(height: 8),
+                        _buildGameModeButton(
+                          'Time Attack',
+                          'timeAttack',
+                          localGameMode,
+                          () {
+                            setState(() {
+                              localGameMode = 'timeAttack';
+                            });
+                          },
+                          true,
+                        ),
+                        const SizedBox(height: 8),
+                        _buildGameModeButton(
+                          'Survival',
+                          'survival',
+                          localGameMode,
+                          () {
+                            setState(() {
+                              localGameMode = 'survival';
+                            });
+                          },
+                          true,
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        _buildGameModeButton(
+                          'Classic',
+                          'classic',
+                          localGameMode,
+                          () {
+                            setState(() {
+                              localGameMode = 'classic';
+                            });
+                          },
+                          false,
+                        ),
+                        const SizedBox(width: 10),
+                        _buildGameModeButton(
+                          'Time Attack',
+                          'timeAttack',
+                          localGameMode,
+                          () {
+                            setState(() {
+                              localGameMode = 'timeAttack';
+                            });
+                          },
+                          false,
+                        ),
+                        const SizedBox(width: 10),
+                        _buildGameModeButton(
+                          'Survival',
+                          'survival',
+                          localGameMode,
+                          () {
+                            setState(() {
+                              localGameMode = 'survival';
+                            });
+                          },
+                          false,
+                        ),
+                      ],
+                    ),
               
-              const SizedBox(height: 30),
+              SizedBox(height: isMobile ? 20 : 30),
               
               Center(
                 child: ElevatedButton(
@@ -518,7 +666,10 @@ class TitleScreen extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.indigo.shade700,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 24 : 32, 
+                      vertical: isMobile ? 12 : 16
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
                     ),
@@ -535,50 +686,70 @@ class TitleScreen extends StatelessWidget {
             ],
           ),
           onClose: onCloseModal,
+          isMobile: isMobile,
         );
       },
     );
   }
   
-  Widget _buildGameModeButton(String label, String value, String currentMode, VoidCallback onPressed) {
+  Widget _buildGameModeButton(String label, String value, String currentMode, VoidCallback onPressed, bool fullWidth) {
     final isSelected = value == currentMode;
     
-    return Expanded(
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isSelected ? Colors.indigo.shade700 : Colors.grey.shade200,
-          foregroundColor: isSelected ? Colors.white : Colors.black87,
-          elevation: isSelected ? 5 : 0,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
+    return fullWidth
+        ? SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: onPressed,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isSelected ? Colors.indigo.shade700 : Colors.grey.shade200,
+                foregroundColor: isSelected ? Colors.white : Colors.black87,
+                elevation: isSelected ? 5 : 0,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ),
+          )
+        : Expanded(
+            child: ElevatedButton(
+              onPressed: onPressed,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isSelected ? Colors.indigo.shade700 : Colors.grey.shade200,
+                foregroundColor: isSelected ? Colors.white : Colors.black87,
+                elevation: isSelected ? 5 : 0,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ),
+          );
   }
   
-  Widget _buildInstructionSection(String title, String content) {
+  Widget _buildInstructionSection(String title, String content, bool isMobile) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.bold,
-            fontSize: 18,
+            fontSize: isMobile ? 16 : 18,
             color: Colors.indigo,
           ),
         ),
         const SizedBox(height: 8),
         Text(
           content,
-          style: const TextStyle(
-            fontSize: 14,
+          style: TextStyle(
+            fontSize: isMobile ? 13 : 14,
             height: 1.5,
           ),
         ),
@@ -591,6 +762,7 @@ class TitleScreen extends StatelessWidget {
     required String title,
     required Widget content,
     required VoidCallback onClose,
+    required bool isMobile,
   }) {
     return Container(
       width: double.infinity,
@@ -598,8 +770,8 @@ class TitleScreen extends StatelessWidget {
       color: Colors.black54,
       child: Center(
         child: Container(
-          width: min(600, MediaQuery.of(context).size.width * 0.9),
-          padding: const EdgeInsets.all(24),
+          width: min(isMobile ? 500 : 600, MediaQuery.of(context).size.width * 0.9),
+          padding: EdgeInsets.all(isMobile ? 16 : 24),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -620,8 +792,8 @@ class TitleScreen extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      fontSize: 24,
+                    style: TextStyle(
+                      fontSize: isMobile ? 20 : 24,
                       fontWeight: FontWeight.bold,
                       color: Colors.indigo,
                     ),
@@ -657,6 +829,7 @@ class ChaseGameScreen extends StatefulWidget {
   final bool enableObstacles;
   final bool enablePowerups;
   final String gameMode;
+  final bool isMobile;
 
   const ChaseGameScreen({
     super.key,
@@ -666,6 +839,7 @@ class ChaseGameScreen extends StatefulWidget {
     required this.enableObstacles,
     required this.enablePowerups,
     required this.gameMode,
+    required this.isMobile,
   });
 
   @override
@@ -689,8 +863,14 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
   double player1Y = 100;
   double player2X = 400;
   double player2Y = 400;
-  final double playerSize = 50;
+  late double playerSize;
   late double playerSpeed;
+  
+  // Mobile controls
+  Offset player1JoystickPosition = Offset.zero;
+  Offset player2JoystickPosition = Offset.zero;
+  bool player1JoystickActive = false;
+  bool player2JoystickActive = false;
   
   // Player stats
   double player1Speed = 0;
@@ -742,6 +922,7 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
     // Initialize game settings
     timeLeft = widget.gameDuration;
     playerSpeed = widget.playerSpeed;
+    playerSize = widget.isMobile ? 40 : 50;
     
     // Initialize animation controllers
     player1PulseController = AnimationController(
@@ -803,9 +984,18 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
   }
 
   void startGame() {
-    // Calculate arena size (80% of screen width, 70% of screen height)
-    arenaWidth = MediaQuery.of(context).size.width * 0.8;
-    arenaHeight = MediaQuery.of(context).size.height * 0.7;
+    // Calculate arena size based on screen size
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    
+    // For mobile, use more of the screen for the arena
+    if (widget.isMobile) {
+      arenaWidth = screenWidth * 0.9;
+      arenaHeight = screenHeight * 0.7;
+    } else {
+      arenaWidth = screenWidth * 0.8;
+      arenaHeight = screenHeight * 0.7;
+    }
     
     // Generate obstacles if enabled
     if (widget.enableObstacles) {
@@ -826,6 +1016,12 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
       player2Shielded = false;
       player1Frozen = false;
       player2Frozen = false;
+      
+      // Reset joystick positions for mobile
+      player1JoystickPosition = Offset.zero;
+      player2JoystickPosition = Offset.zero;
+      player1JoystickActive = false;
+      player2JoystickActive = false;
       
       // Reset game state
       isGameRunning = true;
@@ -861,6 +1057,18 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
         }
       });
     });
+    
+    // Start game loop for smoother movement
+    if (widget.isMobile) {
+      Timer.periodic(const Duration(milliseconds: 16), (timer) {
+        if (isGameRunning && !isPaused && !isGameOver) {
+          updateMobilePlayerPositions();
+        }
+        if (isGameOver) {
+          timer.cancel();
+        }
+      });
+    }
   }
   
   void generateObstacles() {
@@ -1073,6 +1281,49 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
       }
     }
     
+    checkCollisionsAndPowerups(prevPlayer1X, prevPlayer1Y, prevPlayer2X, prevPlayer2Y);
+  }
+  
+  void updateMobilePlayerPositions() {
+    if (!isGameRunning || isPaused) return;
+    
+    // Calculate previous positions for distance calculation
+    final prevPlayer1X = player1X;
+    final prevPlayer1Y = player1Y;
+    final prevPlayer2X = player2X;
+    final prevPlayer2Y = player2Y;
+    
+    // Update Player 1 position (Chaser - Red) if joystick is active and not frozen
+    if (player1JoystickActive && !player1Frozen) {
+      // Normalize joystick vector if it's longer than 1
+      final joystickLength = player1JoystickPosition.distance;
+      final normalizedX = joystickLength > 0 ? player1JoystickPosition.dx / joystickLength : 0;
+      final normalizedY = joystickLength > 0 ? player1JoystickPosition.dy / joystickLength : 0;
+      
+      // Apply movement with speed
+      player1X = max(0, min(arenaWidth - playerSize, player1X + normalizedX * player1Speed));
+      player1Y = max(0, min(arenaHeight - playerSize, player1Y + normalizedY * player1Speed));
+    }
+    
+    // Update Player 2 position (Runner - Blue) if joystick is active and not frozen
+    if (player2JoystickActive && !player2Frozen) {
+      // Normalize joystick vector if it's longer than 1
+      final joystickLength = player2JoystickPosition.distance;
+      final normalizedX = joystickLength > 0 ? player2JoystickPosition.dx / joystickLength : 0;
+      final normalizedY = joystickLength > 0 ? player2JoystickPosition.dy / joystickLength : 0;
+      
+      // Apply movement with speed
+      player2X = max(0, min(arenaWidth - playerSize, player2X + normalizedX * player2Speed));
+      player2Y = max(0, min(arenaHeight - playerSize, player2Y + normalizedY * player2Speed));
+    }
+    
+    setState(() {
+      // Update positions in state
+      checkCollisionsAndPowerups(prevPlayer1X, prevPlayer1Y, prevPlayer2X, prevPlayer2Y);
+    });
+  }
+  
+  void checkCollisionsAndPowerups(double prevPlayer1X, double prevPlayer1Y, double prevPlayer2X, double prevPlayer2Y) {
     // Check for collision with obstacles
     for (final obstacle in obstacles) {
       // Player 1 collision with obstacle
@@ -1137,6 +1388,79 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
         player1Y < player2Y + playerSize &&
         player1Y + playerSize > player2Y);
   }
+  
+  // Handle touch events for mobile joysticks
+  void onPlayer1JoystickPanStart(DragStartDetails details) {
+    final joystickCenter = _getPlayer1JoystickCenter();
+    player1JoystickActive = true;
+    player1JoystickPosition = Offset.zero;
+  }
+  
+  void onPlayer1JoystickPanUpdate(DragUpdateDetails details) {
+    if (!player1JoystickActive) return;
+    
+    final joystickCenter = _getPlayer1JoystickCenter();
+    final joystickRadius = 50.0;
+    
+    // Calculate joystick position relative to center
+    Offset newPosition = details.localPosition - joystickCenter;
+    
+    // Limit joystick position to the circle
+    if (newPosition.distance > joystickRadius) {
+      newPosition = newPosition * (joystickRadius / newPosition.distance);
+    }
+    
+    setState(() {
+      player1JoystickPosition = newPosition;
+    });
+  }
+  
+  void onPlayer1JoystickPanEnd(DragEndDetails details) {
+    setState(() {
+      player1JoystickActive = false;
+      player1JoystickPosition = Offset.zero;
+    });
+  }
+  
+  void onPlayer2JoystickPanStart(DragStartDetails details) {
+    final joystickCenter = _getPlayer2JoystickCenter();
+    player2JoystickActive = true;
+    player2JoystickPosition = Offset.zero;
+  }
+  
+  void onPlayer2JoystickPanUpdate(DragUpdateDetails details) {
+    if (!player2JoystickActive) return;
+    
+    final joystickCenter = _getPlayer2JoystickCenter();
+    final joystickRadius = 50.0;
+    
+    // Calculate joystick position relative to center
+    Offset newPosition = details.localPosition - joystickCenter;
+    
+    // Limit joystick position to the circle
+    if (newPosition.distance > joystickRadius) {
+      newPosition = newPosition * (joystickRadius / newPosition.distance);
+    }
+    
+    setState(() {
+      player2JoystickPosition = newPosition;
+    });
+  }
+  
+  void onPlayer2JoystickPanEnd(DragEndDetails details) {
+    setState(() {
+      player2JoystickActive = false;
+      player2JoystickPosition = Offset.zero;
+    });
+  }
+  
+  Offset _getPlayer1JoystickCenter() {
+    return const Offset(75, 75);
+  }
+  
+  Offset _getPlayer2JoystickCenter() {
+    return const Offset(75, 75);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1155,506 +1479,638 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
             ],
           ),
         ),
-        child: KeyboardListener(
-          focusNode: _focusNode,
-          autofocus: true,
-          onKeyEvent: (KeyEvent event) {
-            if (event is KeyDownEvent) {
-              setState(() {
-                // Player 1 controls (WASD)
-                if (event.logicalKey == LogicalKeyboardKey.keyW ||
-                    event.logicalKey == LogicalKeyboardKey.keyA ||
-                    event.logicalKey == LogicalKeyboardKey.keyS ||
-                    event.logicalKey == LogicalKeyboardKey.keyD) {
-                  player1Keys.add(event.logicalKey);
-                }
-                
-                // Player 2 controls (Arrow keys)
-                if (event.logicalKey == LogicalKeyboardKey.arrowUp ||
-                    event.logicalKey == LogicalKeyboardKey.arrowDown ||
-                    event.logicalKey == LogicalKeyboardKey.arrowLeft ||
-                    event.logicalKey == LogicalKeyboardKey.arrowRight) {
-                  player2Keys.add(event.logicalKey);
-                }
-                
-                // Pause game with Escape key
-                if (event.logicalKey == LogicalKeyboardKey.escape && isGameRunning) {
-                  togglePause();
-                }
-              });
-            } else if (event is KeyUpEvent) {
-              setState(() {
-                // Player 1 controls (WASD)
-                if (event.logicalKey == LogicalKeyboardKey.keyW ||
-                    event.logicalKey == LogicalKeyboardKey.keyA ||
-                    event.logicalKey == LogicalKeyboardKey.keyS ||
-                    event.logicalKey == LogicalKeyboardKey.keyD) {
-                  player1Keys.remove(event.logicalKey);
-                }
-                
-                // Player 2 controls (Arrow keys)
-                if (event.logicalKey == LogicalKeyboardKey.arrowUp ||
-                    event.logicalKey == LogicalKeyboardKey.arrowDown ||
-                    event.logicalKey == LogicalKeyboardKey.arrowLeft ||
-                    event.logicalKey == LogicalKeyboardKey.arrowRight) {
-                  player2Keys.remove(event.logicalKey);
-                }
-              });
+        child: widget.isMobile
+            ? _buildMobileGameLayout()
+            : _buildDesktopGameLayout(),
+      ),
+    );
+  }
+  
+  Widget _buildDesktopGameLayout() {
+    return KeyboardListener(
+      focusNode: _focusNode,
+      autofocus: true,
+      onKeyEvent: (KeyEvent event) {
+        if (event is KeyDownEvent) {
+          setState(() {
+            // Player 1 controls (WASD)
+            if (event.logicalKey == LogicalKeyboardKey.keyW ||
+                event.logicalKey == LogicalKeyboardKey.keyA ||
+                event.logicalKey == LogicalKeyboardKey.keyS ||
+                event.logicalKey == LogicalKeyboardKey.keyD) {
+              player1Keys.add(event.logicalKey);
             }
             
-            if (isGameRunning && !isPaused) {
-              updatePlayerPositions();
+            // Player 2 controls (Arrow keys)
+            if (event.logicalKey == LogicalKeyboardKey.arrowUp ||
+                event.logicalKey == LogicalKeyboardKey.arrowDown ||
+                event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+                event.logicalKey == LogicalKeyboardKey.arrowRight) {
+              player2Keys.add(event.logicalKey);
             }
-          },
-          child: Stack(
-            children: [
-              // Game header
-              Positioned(
-                top: 20,
-                left: 0,
-                right: 0,
-                child: _buildGameHeader(),
-              ),
-              
-              // Game arena
-              Center(
-                child: Container(
-                  width: arenaWidth,
-                  height: arenaHeight,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 10,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: Stack(
-                      children: [
-                        // Arena grid pattern
-                        ...List.generate(20, (i) => 
-                          Positioned(
-                            left: 0,
-                            top: i * (arenaHeight / 20),
-                            child: Container(
-                              width: arenaWidth,
-                              height: 1,
-                              color: Colors.grey.shade300,
-                            ),
-                          ),
-                        ),
-                        ...List.generate(20, (i) => 
-                          Positioned(
-                            left: i * (arenaWidth / 20),
-                            top: 0,
-                            child: Container(
-                              width: 1,
-                              height: arenaHeight,
-                              color: Colors.grey.shade300,
-                            ),
-                          ),
-                        ),
-                        
-                        // Obstacles
-                        if (widget.enableObstacles)
-                          ...obstacles.map((obstacle) => 
-                            Positioned(
-                              left: obstacle.x,
-                              top: obstacle.y,
-                              child: Container(
-                                width: obstacle.width,
-                                height: obstacle.height,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade800,
-                                  borderRadius: BorderRadius.circular(8),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black26,
-                                      blurRadius: 4,
-                                      spreadRadius: 1,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        
-                        // Power-ups
-                        ...powerUps.map((powerUp) => 
-                          Positioned(
-                            left: powerUp.x,
-                            top: powerUp.y,
-                            child: Container(
-                              width: 30,
-                              height: 30,
-                              decoration: BoxDecoration(
-                                color: _getPowerUpColor(powerUp.type),
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: _getPowerUpColor(powerUp.type).withOpacity(0.5),
-                                    blurRadius: 10,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
-                              ),
-                              child: Center(
-                                child: Icon(
-                                  _getPowerUpIcon(powerUp.type),
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        
-                        // Player 1 (Chaser - Red)
-                        Positioned(
-                          left: player1X,
-                          top: player1Y,
-                          child: AnimatedBuilder(
-                            animation: player1PulseController,
-                            builder: (context, child) {
-                              return Container(
-                                width: playerSize,
-                                height: playerSize,
-                                decoration: BoxDecoration(
-                                  color: Colors.red.shade500,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.red.shade700.withOpacity(0.7),
-                                      blurRadius: 10 + player1PulseController.value * 5,
-                                      spreadRadius: 2 + player1PulseController.value * 2,
-                                    ),
-                                  ],
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Colors.red.shade400,
-                                      Colors.red.shade700,
-                                    ],
-                                  ),
-                                ),
-                                child: Stack(
-                                  children: [
-                                    Center(
-                                      child: const Text(
-                                        '1',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 18,
-                                        ),
-                                      ),
-                                    ),
-                                    if (player1Frozen)
-                                      Container(
-                                        width: playerSize,
-                                        height: playerSize,
-                                        decoration: BoxDecoration(
-                                          color: Colors.blue.withOpacity(0.5),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Center(
-                                          child: Icon(
-                                            Icons.ac_unit,
-                                            color: Colors.white,
-                                            size: 24,
-                                          ),
-                                        ),
-                                      ),
-                                    if (player1Shielded)
-                                      Container(
-                                        width: playerSize,
-                                        height: playerSize,
-                                        decoration: BoxDecoration(
-                                          color: Colors.transparent,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: Colors.yellow.shade500,
-                                            width: 3,
-                                          ),
-                                        ),
-                                      ),
-                                    if (player1Speed > playerSpeed)
-                                      Positioned(
-                                        right: 0,
-                                        bottom: 0,
-                                        child: Container(
-                                          width: 20,
-                                          height: 20,
-                                          decoration: BoxDecoration(
-                                            color: Colors.green,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Center(
-                                            child: Icon(
-                                              Icons.bolt,
-                                              color: Colors.white,
-                                              size: 12,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        
-                        // Player 2 (Runner - Blue)
-                        Positioned(
-                          left: player2X,
-                          top: player2Y,
-                          child: AnimatedBuilder(
-                            animation: player2PulseController,
-                            builder: (context, child) {
-                              return Container(
-                                width: playerSize,
-                                height: playerSize,
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.shade500,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.blue.shade700.withOpacity(0.7),
-                                      blurRadius: 10 + player2PulseController.value * 5,
-                                      spreadRadius: 2 + player2PulseController.value * 2,
-                                    ),
-                                  ],
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Colors.blue.shade400,
-                                      Colors.blue.shade700,
-                                    ],
-                                  ),
-                                ),
-                                child: Stack(
-                                  children: [
-                                    Center(
-                                      child: const Text(
-                                        '2',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 18,
-                                        ),
-                                      ),
-                                    ),
-                                    if (player2Frozen)
-                                      Container(
-                                        width: playerSize,
-                                        height: playerSize,
-                                        decoration: BoxDecoration(
-                                          color: Colors.blue.withOpacity(0.5),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Center(
-                                          child: Icon(
-                                            Icons.ac_unit,
-                                            color: Colors.white,
-                                            size: 24,
-                                          ),
-                                        ),
-                                      ),
-                                    if (player2Shielded)
-                                      Container(
-                                        width: playerSize,
-                                        height: playerSize,
-                                        decoration: BoxDecoration(
-                                          color: Colors.transparent,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: Colors.yellow.shade500,
-                                            width: 3,
-                                          ),
-                                        ),
-                                      ),
-                                    if (player2Speed > playerSpeed)
-                                      Positioned(
-                                        right: 0,
-                                        bottom: 0,
-                                        child: Container(
-                                          width: 20,
-                                          height: 20,
-                                          decoration: BoxDecoration(
-                                            color: Colors.green,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Center(
-                                            child: Icon(
-                                              Icons.bolt,
-                                              color: Colors.white,
-                                              size: 12,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
+            
+            // Pause game with Escape key
+            if (event.logicalKey == LogicalKeyboardKey.escape && isGameRunning) {
+              togglePause();
+            }
+          });
+        } else if (event is KeyUpEvent) {
+          setState(() {
+            // Player 1 controls (WASD)
+            if (event.logicalKey == LogicalKeyboardKey.keyW ||
+                event.logicalKey == LogicalKeyboardKey.keyA ||
+                event.logicalKey == LogicalKeyboardKey.keyS ||
+                event.logicalKey == LogicalKeyboardKey.keyD) {
+              player1Keys.remove(event.logicalKey);
+            }
+            
+            // Player 2 controls (Arrow keys)
+            if (event.logicalKey == LogicalKeyboardKey.arrowUp ||
+                event.logicalKey == LogicalKeyboardKey.arrowDown ||
+                event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+                event.logicalKey == LogicalKeyboardKey.arrowRight) {
+              player2Keys.remove(event.logicalKey);
+            }
+          });
+        }
+        
+        if (isGameRunning && !isPaused) {
+          updatePlayerPositions();
+        }
+      },
+      child: _buildGameContent(),
+    );
+  }
+  
+  Widget _buildMobileGameLayout() {
+    return Stack(
+      children: [
+        _buildGameContent(),
+        
+        // Mobile controls - only show when game is running and not paused
+        if (isGameRunning && !isPaused && !isGameOver && !isCountdown)
+          Positioned(
+            left: 20,
+            bottom: 20,
+            child: _buildJoystick(
+              player1JoystickPosition,
+              Colors.red.shade400,
+              Colors.red.shade700,
+              onPlayer1JoystickPanStart,
+              onPlayer1JoystickPanUpdate,
+              onPlayer1JoystickPanEnd,
+            ),
+          ),
+          
+        if (isGameRunning && !isPaused && !isGameOver && !isCountdown)
+          Positioned(
+            right: 20,
+            bottom: 20,
+            child: _buildJoystick(
+              player2JoystickPosition,
+              Colors.blue.shade400,
+              Colors.blue.shade700,
+              onPlayer2JoystickPanStart,
+              onPlayer2JoystickPanUpdate,
+              onPlayer2JoystickPanEnd,
+            ),
+          ),
+      ],
+    );
+  }
+  
+  Widget _buildJoystick(
+    Offset position,
+    Color baseColor,
+    Color stickColor,
+    Function(DragStartDetails) onPanStart,
+    Function(DragUpdateDetails) onPanUpdate,
+    Function(DragEndDetails) onPanEnd,
+  ) {
+    return GestureDetector(
+      onPanStart: onPanStart,
+      onPanUpdate: onPanUpdate,
+      onPanEnd: onPanEnd,
+      child: Container(
+        width: 150,
+        height: 150,
+        decoration: BoxDecoration(
+          color: Colors.black38,
+          shape: BoxShape.circle,
+        ),
+        child: Stack(
+          children: [
+            // Joystick base
+            Center(
+              child: Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: baseColor.withOpacity(0.5),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: baseColor,
+                    width: 2,
                   ),
                 ),
               ),
-              
-              // Game controls
-              Positioned(
-                bottom: 20,
-                left: 0,
-                right: 0,
-                child: _buildGameControls(),
+            ),
+            // Joystick handle
+            Center(
+              child: Transform.translate(
+                offset: position,
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: stickColor,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 5,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              
-              // Countdown overlay
-              if (isCountdown)
-                Container(
-                  width: double.infinity,
-                  height: double.infinity,
-                  color: Colors.black54,
-                  child: Center(
-                    child: AnimatedBuilder(
-                      animation: countdownController,
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: 1.0 + (1.0 - countdownController.value) * 0.5,
-                          child: Opacity(
-                            opacity: 1.0 - countdownController.value,
-                            child: Text(
-                              countdownValue.toString(),
-                              style: TextStyle(
-                                fontSize: 120,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildGameContent() {
+    return Stack(
+      children: [
+        // Game header
+        Positioned(
+          top: 20,
+          left: 0,
+          right: 0,
+          child: _buildGameHeader(),
+        ),
+        
+        // Game arena
+        Center(
+          child: Container(
+            width: arenaWidth,
+            height: arenaHeight,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Stack(
+                children: [
+                  // Arena grid pattern
+                  ...List.generate(20, (i) => 
+                    Positioned(
+                      left: 0,
+                      top: i * (arenaHeight / 20),
+                      child: Container(
+                        width: arenaWidth,
+                        height: 1,
+                        color: Colors.grey.shade300,
+                      ),
+                    ),
+                  ),
+                  ...List.generate(20, (i) => 
+                    Positioned(
+                      left: i * (arenaWidth / 20),
+                      top: 0,
+                      child: Container(
+                        width: 1,
+                        height: arenaHeight,
+                        color: Colors.grey.shade300,
+                      ),
+                    ),
+                  ),
+                  
+                  // Obstacles
+                  if (widget.enableObstacles)
+                    ...obstacles.map((obstacle) => 
+                      Positioned(
+                        left: obstacle.x,
+                        top: obstacle.y,
+                        child: Container(
+                          width: obstacle.width,
+                          height: obstacle.height,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade800,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 4,
+                                spreadRadius: 1,
                               ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  
+                  // Power-ups
+                  ...powerUps.map((powerUp) => 
+                    Positioned(
+                      left: powerUp.x,
+                      top: powerUp.y,
+                      child: Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: _getPowerUpColor(powerUp.type),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: _getPowerUpColor(powerUp.type).withOpacity(0.5),
+                              blurRadius: 10,
+                              spreadRadius: 2,
                             ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Icon(
+                            _getPowerUpIcon(powerUp.type),
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  // Player 1 (Chaser - Red)
+                  Positioned(
+                    left: player1X,
+                    top: player1Y,
+                    child: AnimatedBuilder(
+                      animation: player1PulseController,
+                      builder: (context, child) {
+                        return Container(
+                          width: playerSize,
+                          height: playerSize,
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade500,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.red.shade700.withOpacity(0.7),
+                                blurRadius: 10 + player1PulseController.value * 5,
+                                spreadRadius: 2 + player1PulseController.value * 2,
+                              ),
+                            ],
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.red.shade400,
+                                Colors.red.shade700,
+                              ],
+                            ),
+                          ),
+                          child: Stack(
+                            children: [
+                              Center(
+                                child: Text(
+                                  '1',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: widget.isMobile ? 16 : 18,
+                                  ),
+                                ),
+                              ),
+                              if (player1Frozen)
+                                Container(
+                                  width: playerSize,
+                                  height: playerSize,
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.withOpacity(0.5),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Icon(
+                                      Icons.ac_unit,
+                                      color: Colors.white,
+                                      size: widget.isMobile ? 20 : 24,
+                                    ),
+                                  ),
+                                ),
+                              if (player1Shielded)
+                                Container(
+                                  width: playerSize,
+                                  height: playerSize,
+                                  decoration: BoxDecoration(
+                                    color: Colors.transparent,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.yellow.shade500,
+                                      width: 3,
+                                    ),
+                                  ),
+                                ),
+                              if (player1Speed > playerSpeed)
+                                Positioned(
+                                  right: 0,
+                                  bottom: 0,
+                                  child: Container(
+                                    width: widget.isMobile ? 16 : 20,
+                                    height: widget.isMobile ? 16 : 20,
+                                    decoration: BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.bolt,
+                                        color: Colors.white,
+                                        size: widget.isMobile ? 10 : 12,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         );
                       },
                     ),
                   ),
-                ),
-              
-              // Pause overlay
-              if (isPaused)
-                Container(
-                  width: double.infinity,
-                  height: double.infinity,
-                  color: Colors.black54,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text(
-                          'GAME PAUSED',
-                          style: TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 2,
-                          ),
-                        ),
-                        const SizedBox(height: 30),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _buildPauseMenuButton(
-                              'RESUME',
-                              Icons.play_arrow,
-                              togglePause,
-                            ),
-                            const SizedBox(width: 20),
-                            _buildPauseMenuButton(
-                              'QUIT',
-                              Icons.exit_to_app,
-                              widget.onBackToTitle,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              
-              // Game over overlay
-              if (isGameOver)
-                Container(
-                  width: double.infinity,
-                  height: double.infinity,
-                  color: Colors.black54,
-                  child: Center(
-                    child: Container(
-                      width: min(500, MediaQuery.of(context).size.width * 0.9),
-                      padding: const EdgeInsets.all(30),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 10,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'GAME OVER',
-                            style: TextStyle(
-                              fontSize: 36,
-                              fontWeight: FontWeight.bold,
-                              color: winner.contains('Red') ? Colors.red.shade700 : Colors.blue.shade700,
-                              letterSpacing: 2,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          Text(
-                            '$winner WINS!',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: winner.contains('Red') ? Colors.red.shade700 : Colors.blue.shade700,
-                            ),
-                          ),
-                          const SizedBox(height: 30),
-                          
-                          // Game stats
-                          Container(
-                            padding: const EdgeInsets.all(15),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Column(
-                              children: [
-                                _buildGameStat('Time Played', '${widget.gameDuration - timeLeft} seconds'),
-                                _buildGameStat('Near Misses', '$nearMisses'),
-                                _buildGameStat('Power-ups Collected', '$powerUpsCollected'),
-                                _buildGameStat('Distance Traveled', '${distanceTraveled}m'),
+                  
+                  // Player 2 (Runner - Blue)
+                  Positioned(
+                    left: player2X,
+                    top: player2Y,
+                    child: AnimatedBuilder(
+                      animation: player2PulseController,
+                      builder: (context, child) {
+                        return Container(
+                          width: playerSize,
+                          height: playerSize,
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade500,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.blue.shade700.withOpacity(0.7),
+                                blurRadius: 10 + player2PulseController.value * 5,
+                                spreadRadius: 2 + player2PulseController.value * 2,
+                              ),
+                            ],
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.blue.shade400,
+                                Colors.blue.shade700,
                               ],
                             ),
                           ),
-                          
-                          const SizedBox(height: 30),
-                          
-                          Row(
+                          child: Stack(
+                            children: [
+                              Center(
+                                child: Text(
+                                  '2',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: widget.isMobile ? 16 : 18,
+                                  ),
+                                ),
+                              ),
+                              if (player2Frozen)
+                                Container(
+                                  width: playerSize,
+                                  height: playerSize,
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.withOpacity(0.5),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Icon(
+                                      Icons.ac_unit,
+                                      color: Colors.white,
+                                      size: widget.isMobile ? 20 : 24,
+                                    ),
+                                  ),
+                                ),
+                              if (player2Shielded)
+                                Container(
+                                  width: playerSize,
+                                  height: playerSize,
+                                  decoration: BoxDecoration(
+                                    color: Colors.transparent,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.yellow.shade500,
+                                      width: 3,
+                                    ),
+                                  ),
+                                ),
+                              if (player2Speed > playerSpeed)
+                                Positioned(
+                                  right: 0,
+                                  bottom: 0,
+                                  child: Container(
+                                    width: widget.isMobile ? 16 : 20,
+                                    height: widget.isMobile ? 16 : 20,
+                                    decoration: BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.bolt,
+                                        color: Colors.white,
+                                        size: widget.isMobile ? 10 : 12,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        
+        // Game controls for desktop
+        if (!widget.isMobile)
+          Positioned(
+            bottom: 20,
+            left: 0,
+            right: 0,
+            child: _buildGameControls(),
+          ),
+        
+        // Countdown overlay
+        if (isCountdown)
+          Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.black54,
+            child: Center(
+              child: AnimatedBuilder(
+                animation: countdownController,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: 1.0 + (1.0 - countdownController.value) * 0.5,
+                    child: Opacity(
+                      opacity: 1.0 - countdownController.value,
+                      child: Text(
+                        countdownValue.toString(),
+                        style: TextStyle(
+                          fontSize: widget.isMobile ? 80 : 120,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        
+        // Pause overlay
+        if (isPaused)
+          Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.black54,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'GAME PAUSED',
+                    style: TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildPauseMenuButton(
+                        'RESUME',
+                        Icons.play_arrow,
+                        togglePause,
+                      ),
+                      const SizedBox(width: 20),
+                      _buildPauseMenuButton(
+                        'QUIT',
+                        Icons.exit_to_app,
+                        widget.onBackToTitle,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        
+        // Game over overlay
+        if (isGameOver)
+          Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.black54,
+            child: Center(
+              child: Container(
+                width: min(widget.isMobile ? 400 : 500, MediaQuery.of(context).size.width * 0.9),
+                padding: EdgeInsets.all(widget.isMobile ? 20 : 30),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'GAME OVER',
+                      style: TextStyle(
+                        fontSize: widget.isMobile ? 28 : 36,
+                        fontWeight: FontWeight.bold,
+                        color: winner.contains('Red') ? Colors.red.shade700 : Colors.blue.shade700,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    SizedBox(height: widget.isMobile ? 15 : 20),
+                    Text(
+                      '$winner WINS!',
+                      style: TextStyle(
+                        fontSize: widget.isMobile ? 20 : 24,
+                        fontWeight: FontWeight.bold,
+                        color: winner.contains('Red') ? Colors.red.shade700 : Colors.blue.shade700,
+                      ),
+                    ),
+                    SizedBox(height: widget.isMobile ? 20 : 30),
+                    
+                    // Game stats
+                    Container(
+                      padding: EdgeInsets.all(widget.isMobile ? 12 : 15),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        children: [
+                          _buildGameStat('Time Played', '${widget.gameDuration - timeLeft} seconds'),
+                          _buildGameStat('Near Misses', '$nearMisses'),
+                          _buildGameStat('Power-ups Collected', '$powerUpsCollected'),
+                          _buildGameStat('Distance Traveled', '${distanceTraveled}m'),
+                        ],
+                      ),
+                    ),
+                    
+                    SizedBox(height: widget.isMobile ? 20 : 30),
+                    
+                    widget.isMobile
+                        ? Column(
+                            children: [
+                              _buildGameOverButton(
+                                'PLAY AGAIN',
+                                Icons.replay,
+                                startCountdown,
+                                Colors.green.shade600,
+                              ),
+                              const SizedBox(height: 10),
+                              _buildGameOverButton(
+                                'MAIN MENU',
+                                Icons.home,
+                                widget.onBackToTitle,
+                                Colors.blue.shade600,
+                              ),
+                            ],
+                          )
+                        : Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               _buildGameOverButton(
@@ -1672,15 +2128,31 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  ],
                 ),
-            ],
+              ),
+            ),
           ),
-        ),
-      ),
+          
+        // Mobile pause button
+        if (widget.isMobile && isGameRunning && !isGameOver && !isCountdown)
+          Positioned(
+            top: 20,
+            right: 20,
+            child: IconButton(
+              onPressed: togglePause,
+              icon: Icon(
+                isPaused ? Icons.play_arrow : Icons.pause,
+                color: Colors.white,
+                size: 30,
+              ),
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.black54,
+                padding: const EdgeInsets.all(8),
+              ),
+            ),
+          ),
+      ],
     );
   }
   
@@ -1689,7 +2161,10 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          padding: EdgeInsets.symmetric(
+            horizontal: widget.isMobile ? 15 : 20, 
+            vertical: widget.isMobile ? 8 : 10
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(30),
@@ -1706,37 +2181,40 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
             children: [
               // Player 1 indicator
               Container(
-                width: 20,
-                height: 20,
+                width: widget.isMobile ? 16 : 20,
+                height: widget.isMobile ? 16 : 20,
                 decoration: BoxDecoration(
                   color: Colors.red.shade500,
                   shape: BoxShape.circle,
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
                     '1',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 10,
+                      fontSize: widget.isMobile ? 8 : 10,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              const Text(
+              SizedBox(width: widget.isMobile ? 6 : 8),
+              Text(
                 'Chaser',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                  fontSize: widget.isMobile ? 12 : 14,
                 ),
               ),
               
-              const SizedBox(width: 20),
+              SizedBox(width: widget.isMobile ? 15 : 20),
               
               // Timer
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                padding: EdgeInsets.symmetric(
+                  horizontal: widget.isMobile ? 10 : 15, 
+                  vertical: widget.isMobile ? 3 : 5
+                ),
                 decoration: BoxDecoration(
                   color: timeLeft <= 10 ? Colors.red.shade100 : Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(20),
@@ -1745,15 +2223,15 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
                   children: [
                     Icon(
                       Icons.timer,
-                      size: 18,
+                      size: widget.isMobile ? 14 : 18,
                       color: timeLeft <= 10 ? Colors.red.shade700 : Colors.grey.shade700,
                     ),
-                    const SizedBox(width: 5),
+                    SizedBox(width: widget.isMobile ? 3 : 5),
                     Text(
                       '$timeLeft',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 18,
+                        fontSize: widget.isMobile ? 16 : 18,
                         color: timeLeft <= 10 ? Colors.red.shade700 : Colors.grey.shade700,
                       ),
                     ),
@@ -1761,31 +2239,31 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
                 ),
               ),
               
-              const SizedBox(width: 20),
+              SizedBox(width: widget.isMobile ? 15 : 20),
               
               // Player 2 indicator
-              const Text(
+              Text(
                 'Runner',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                  fontSize: widget.isMobile ? 12 : 14,
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: widget.isMobile ? 6 : 8),
               Container(
-                width: 20,
-                height: 20,
+                width: widget.isMobile ? 16 : 20,
+                height: widget.isMobile ? 16 : 20,
                 decoration: BoxDecoration(
                   color: Colors.blue.shade500,
                   shape: BoxShape.circle,
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
                     '2',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 10,
+                      fontSize: widget.isMobile ? 8 : 10,
                     ),
                   ),
                 ),
@@ -1794,19 +2272,20 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
           ),
         ),
         
-        const SizedBox(width: 15),
-        
-        // Pause button
-        if (isGameRunning && !isGameOver && !isCountdown)
-          IconButton(
-            onPressed: togglePause,
-            icon: Icon(
-              isPaused ? Icons.play_arrow : Icons.pause,
-              color: Colors.white,
-            ),
-            style: IconButton.styleFrom(
-              backgroundColor: Colors.black54,
-              padding: const EdgeInsets.all(8),
+        // Desktop pause button
+        if (!widget.isMobile && isGameRunning && !isGameOver && !isCountdown)
+          Padding(
+            padding: const EdgeInsets.only(left: 15),
+            child: IconButton(
+              onPressed: togglePause,
+              icon: Icon(
+                isPaused ? Icons.play_arrow : Icons.pause,
+                color: Colors.white,
+              ),
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.black54,
+                padding: const EdgeInsets.all(8),
+              ),
             ),
           ),
       ],
@@ -1908,7 +2387,10 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        padding: EdgeInsets.symmetric(
+          horizontal: widget.isMobile ? 16 : 24, 
+          vertical: widget.isMobile ? 10 : 12
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(30),
         ),
@@ -1916,8 +2398,8 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon),
-          const SizedBox(width: 8),
+          Icon(icon, size: widget.isMobile ? 20 : 24),
+          SizedBox(width: widget.isMobile ? 6 : 8),
           Text(
             label,
             style: const TextStyle(
@@ -1935,7 +2417,10 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
         foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        padding: EdgeInsets.symmetric(
+          horizontal: widget.isMobile ? 16 : 20, 
+          vertical: widget.isMobile ? 10 : 12
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(30),
         ),
@@ -1943,8 +2428,8 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon),
-          const SizedBox(width: 8),
+          Icon(icon, size: widget.isMobile ? 20 : 24),
+          SizedBox(width: widget.isMobile ? 6 : 8),
           Text(
             label,
             style: const TextStyle(
@@ -1966,14 +2451,14 @@ class _ChaseGameScreenState extends State<ChaseGameScreen> with TickerProviderSt
             label,
             style: TextStyle(
               color: Colors.grey.shade700,
-              fontSize: 14,
+              fontSize: widget.isMobile ? 12 : 14,
             ),
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.bold,
-              fontSize: 14,
+              fontSize: widget.isMobile ? 12 : 14,
             ),
           ),
         ],
